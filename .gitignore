@@ -1,0 +1,12 @@
+/venv/
+/.idea/misc.xml
+/.idea/inspectionProfiles/profiles_settings.xml
+/.idea/ProgettoSN.iml
+# Default ignored files
+/shelf/
+/workspace.xml
+/vcs.xml
+/modules.xml
+/.idea/modules.xml
+/.idea/vcs.xml
+/.idea/workspace.xml
