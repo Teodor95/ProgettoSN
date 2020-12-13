@@ -3,8 +3,12 @@ from collections import defaultdict
 import networkx as nx
 from matplotlib import pylab
 from sklearn import cluster
-import matplotlib
 import matplotlib.pyplot as plt
+import time
+import sys
+import gc
+import objsize
+
 
 class Graph:
     G = None
@@ -15,11 +19,11 @@ class Graph:
     def __init__(self):
         print('Start Load Data')
         self.G = nx.read_adjlist('Files/com-amazon.ungraph.txt')
-        self.groudTruthALLC = nx.read_adjlist('Files/com-amazon.all.dedup.cmty.txt')
-        self.groudTruthTOPC = nx.read_adjlist('Files/com-amazon.top5000.cmty.txt')
-        self.number_of_nodes_G = self.G.number_of_nodes()
-        self.number_of_edges_G = self.G.number_of_edges()
-        self.RG = nx.gnm_random_graph(self.number_of_nodes_G, self.number_of_edges_G)
+        # self.groudTruthALLC = nx.read_adjlist('Files/com-amazon.all.dedup.cmty.txt')
+        # self.groudTruthTOPC = nx.read_adjlist('Files/com-amazon.top5000.cmty.txt')
+        # self.number_of_nodes_G = self.G.number_of_nodes()
+        # self.number_of_edges_G = self.G.number_of_edges()
+        # self.RG = nx.gnm_random_graph(self.number_of_nodes_G, self.number_of_edges_G)
         print('Finish Load Data')
 
 
@@ -168,13 +172,141 @@ def print_initial_data():
     f.close()
 
 
+class Node:
+    x = None
+    y = None
+
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+
+class Community:
+    id = None
+    nodes = []
+
+    def __init__(self, _id, _nodes):
+        self.id = _id
+        self.nodes = _nodes.copy()
+
+
+def read_data_top_5000_comm():
+    start = time.time()
+    with open('Files/com-amazon.top5000.cmty.txt') as infile:
+        id = 0
+        for line in infile:
+            id += 1
+            try:
+                _line = line.split('\t')
+                _nodes = []
+                for xx in _line:
+                    _nodes.append(int(xx.strip()))
+                _comm = Community(id, _nodes)
+                communities.append(_comm)
+            except ValueError as e:
+                print(e)
+    print('Communities count: ' + str(len(communities)))
+    end = time.time()
+    print('Time Load Data communities: ' + str(end - start))
+
+
+def write_data_on_file(writes):
+    f = open('Files/new_dataset.txt', 'a')
+    for k in writes:
+        if k.y is None:
+            f.write(str(k.x) + '\n')
+        else:
+            f.write(str(k.x) + '\t' + str(k.y) + '\n')
+        f.flush()
+    f.close()
+
+
+def check_nodes():
+    if len(nodes) > 5000:
+        size = objsize.get_deep_size(nodes)
+        if size > 1 * 1024 * 1024:
+            write_data_on_file(nodes[:1000])
+            for idx, val in enumerate(nodes):
+                if idx < 1000:
+                    del val
+            gc.collect()
+
+
+def read_data_all_graph_amazon():
+    start = time.time()
+    with open('Files/com-amazon.ungraph.txt') as infile:
+        for line in infile:
+            if line[:1] == '#':
+                continue
+            else:
+                try:
+                    _line = line.split('\t')
+                    x = int(_line[0].strip())
+                    y = int(_line[1].strip())
+                except ValueError:
+                    x = int(_line[0].strip())
+                    y = None
+
+                in_comm = False
+                for comm in communities:
+                    if x in comm.nodes or (y in comm.nodes and y is not None):
+                        in_comm = True
+                        break
+                    else:
+                        in_comm = False
+                if not in_comm:
+                    continue
+
+                _node = Node(x, y)
+                nodes.append(_node)
+                check_nodes()
+
+    print('all nodes count: ' + str(len(nodes)))
+    end = time.time()
+    print('Time Load Data all Nodes: ' + str(end - start))
+
+
+def fun():
+    _nodes = list(graph.G.nodes)
+    _to_remove = list()
+    print(graph.G.number_of_nodes())
+    for node in _nodes:
+        for m in communities:
+            if node not in m.nodes:
+                _to_remove.append(node)
+        if objsize.get_deep_size(_to_remove) > 500 * 1024 * 1024:
+            graph.G.remove_nodes_from(_to_remove)
+            del _to_remove
+            gc.collect()
+            _to_remove = list()
+
+
+
+    graph.G.remove_nodes_from(_to_remove)
+    print(graph.G.number_of_nodes())
+    nx.write_adjlist(graph.G, "teodor.txt")
+
+
 if __name__ == '__main__':
     graph = Graph()
-    print(nx.diameter(graph.G))
-   # print_initial_data()
-   # nx.write_edgelist(graph.G, "test.csv", delimiter=',', data=False)
+    communities = []
+    nodes = []
+    read_data_top_5000_comm()
+    fun()
+    exit()
 
-   # save_graph(graph.G, "mypgraps.pdf")
+    # read_data_all_graph_amazon()
+    # write_data_on_file(nodes)
+
+    count = 0
+    for k in nodes:
+        count = count + 1 + len(k.y)
+    print(count)
+    # print(nx.diameter(graph.G))
+    # print_initial_data()
+    # nx.write_edgelist(graph.G, "test.csv", delimiter=',', data=False)
+
+    # save_graph(graph.G, "mypgraps.pdf")
     exit(33)
     subgraph()
     exit(22)
